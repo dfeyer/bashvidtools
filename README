@@ -1,0 +1,9 @@
+Small Bash Script to work with video file
+=========================================
+
+extract-still.sh
+----------------
+
+- extract still picture at fixed interval (in seconds)
+- can batch process an entire directory
+- skip feature if the current file as been process
