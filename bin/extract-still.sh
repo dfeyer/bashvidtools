@@ -26,7 +26,7 @@ function parseHMS
 	echo "( $hour * 3600 ) + ( $minute * 60 ) + $second"  | bc -l
 }
 
-function getResolution
+function getAnamorphicResolution
 {
 	local file=$1
 	local width=$(mplayerInfo $file | grep ID_VIDEO_WIDTH | cut -d= -f2)
@@ -77,9 +77,14 @@ for foo in $(ls $dir/*.mp4); do
 	else
 		# Get film informations
 		duration=$(getDuration $dir/$foo)
-		resolution=$(getResolution $dir/$foo)
+		resolution=$(getAnamorphicResolution $dir/$foo)
 	
 		echo "$foo ($duration sec.)"
+		if [ "$resolution" != "" ]; then
+			echo -en "\n\t[R] Anamorphism Support Enable ($resolution)"
+		fi
+
+		# Extract still
 		echo -en "\t[E] "
 	
 		while [ $i -lt $duration ]; do
@@ -89,9 +94,10 @@ for foo in $(ls $dir/*.mp4); do
 		done
 	
 		source="$(echo $dir/still/$(echo $foo | sed s/\.mp4//) | sed s/\\/\\.//g)/origin"
-		
+
+		# Anamorphism
 		if [ "$resolution" != "" ]; then
-			echo -en "\n\t[R] Anamorphism Support $resolution"
+			echo -en "\n\t[R] Anamorphism Support"
 			gm mogrify -resize $resolution! +profile "*" $source/*.$format
 		fi
 
