@@ -8,7 +8,7 @@ if [ "$dir" = "" ]; then
 	exit 1
 fi
 
-interval="30"
+interval="90"
 format="png"
 mkdir -p $dir/still
 
@@ -32,9 +32,13 @@ function getResolution
 	local width=$(mplayerInfo $file | grep ID_VIDEO_WIDTH | cut -d= -f2)
 	local height=$(mplayerInfo $file | grep ID_VIDEO_HEIGHT | cut -d= -f2)
 	local aspect=$(mplayerInfo $file | grep ID_VIDEO_ASPECT | cut -d= -f2)
-	local factor=$(echo "scale=5; $aspect / ( $width / $height )" | bc -l)
-	local realWidth=$(echo $(echo "scale=2; $width*$factor" | bc -l) | cut -d. -f1)
-	echo "${realWidth}x${height}"
+	if [ $(echo $aspect | cut -d. -f1) != 0 ]; then
+		local factor=$(echo "scale=5; $aspect / ( $width / $height )" | bc -l)
+		local realWidth=$(echo $(echo "scale=2; $width*$factor" | bc -l) | cut -d. -f1)
+		echo "${realWidth}x${height}"
+	else 
+		echo ""
+	fi
 }
 
 function getDuration
@@ -59,7 +63,7 @@ for foo in $(ls $dir/*.mp4); do
 	i="0"
 	
 	# Check if film has change
-	sumfile=$dir$(echo $foo | sed s/\.mp4//).md5
+	sumfile=${dir}.$(echo $foo | sed s/\.mp4//).md5
 	if [ ! -f $sumfile ]; then
 		md5 ${dir}${foo} | cut -d= -f2 | awk '{print $1}' > $sumfile
 		newsum=$(cat $sumfile)
@@ -75,19 +79,21 @@ for foo in $(ls $dir/*.mp4); do
 		duration=$(getDuration $dir/$foo)
 		resolution=$(getResolution $dir/$foo)
 	
-		echo "$foo ($duration sec.) $resolution"
+		echo "$foo ($duration sec.)"
 		echo -en "\t[E] "
 	
 		while [ $i -lt $duration ]; do
-			extract $i $dir/$foo $resolution
+			extract $i $dir/$foo
 			echo -n .
 			i=$(($i + $interval))
 		done
 	
 		source="$(echo $dir/still/$(echo $foo | sed s/\.mp4//) | sed s/\\/\\.//g)/origin"
 		
-		echo -en "\n\t[R] Anamorphism Support"
-		gm mogrify -resize $resolution! +profile "*" $source/*.$format
+		if [ "$resolution" != "" ]; then
+			echo -en "\n\t[R] Anamorphism Support $resolution"
+			gm mogrify -resize $resolution! +profile "*" $source/*.$format
+		fi
 
 	echo
 	fi
