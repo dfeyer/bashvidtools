@@ -10,7 +10,6 @@ fi
 
 interval="90"
 format="png"
-mkdir -p $dir/still
 
 function mplayerInfo
 {
@@ -57,7 +56,65 @@ function extract
 	return $?
 }
 
-for foo in $(ls $dir/*.mp4); do
+function process
+{
+	local foo=$1
+	local dir=$2
+
+        # Get film informations
+        local duration=$(getDuration $dir/$foo)
+        local resolution=$(getAnamorphicResolution $dir/$foo)
+
+        echo "$foo ($duration sec.)"
+        if [ "$resolution" != "" ]; then
+                echo -e "\n\t[R] Anamorphism Support Enable ($resolution)"
+        fi
+
+        # Extract still
+        echo -en "\t[E] "
+
+	i="0"
+        while [ $i -lt $duration ]; do
+                extract $i $dir/$foo
+                echo -n .
+                i=$(($i + $interval))
+        done
+
+        local source="$(echo $dir/still/$(echo $foo | sed s/\.mp4//) | sed s/\\/\\.//g)/origin"
+
+        # Anamorphism
+        if [ "$resolution" != "" ]; then
+                echo -en "\n\t[R] Anamorphism Support"
+                gm mogrify -resize $resolution! +profile "*" $source/*.$format
+        fi
+
+        # Thumbs
+        echo -e "\n\t[R] Generate thumbnails"
+        thumbs="$(echo $dir/still/$(echo $foo | sed s/\.mp4//) | sed s/\\/\\.//g)/thumbs"
+        mkdir -p $thumbs
+        cp $source/* $thumbs/
+        gm mogrify -resize 160x90 +profile "*" $thumbs/*.$format
+
+	return 0
+}
+
+if [ -f $dir ]; then
+	echo
+	echo "Handle one file ..."
+	
+	foo=$(basename $dir)
+	dir=$(echo $dir | sed s/$foo//)
+	
+	mkdir -p $dir/still
+	
+	process $foo $dir 
+			
+	exit 0
+fi
+
+mkdir -p $dir/still
+
+for foo in $(ls $dir/*.mp4 2> /dev/null); do
 	foo=$(basename $foo)
 	echo
 	i="0"
@@ -75,34 +132,16 @@ for foo in $(ls $dir/*.mp4); do
 	if [ "$oldsum" = "$newsum" ] && [ -d ${dir}still/$(echo $foo | sed s/\.mp4//) ]; then
 		echo "Skip $foo ..."
 	else
-		# Get film informations
-		duration=$(getDuration $dir/$foo)
-		resolution=$(getAnamorphicResolution $dir/$foo)
-	
-		echo "$foo ($duration sec.)"
-		if [ "$resolution" != "" ]; then
-			echo -en "\n\t[R] Anamorphism Support Enable ($resolution)"
-		fi
-
-		# Extract still
-		echo -en "\t[E] "
-	
-		while [ $i -lt $duration ]; do
-			extract $i $dir/$foo
-			echo -n .
-			i=$(($i + $interval))
-		done
-	
-		source="$(echo $dir/still/$(echo $foo | sed s/\.mp4//) | sed s/\\/\\.//g)/origin"
-
-		# Anamorphism
-		if [ "$resolution" != "" ]; then
-			echo -en "\n\t[R] Anamorphism Support"
-			gm mogrify -resize $resolution! +profile "*" $source/*.$format
-		fi
-
+		process $foo $dir
 	echo
 	fi
 done
+
+if [ $? = 0 ]; then
+	echo
+	echo "Movie/Directory not found, bye ..."
+	echo
+	exit 1
+fi
 
 exit 0
